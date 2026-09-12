@@ -14,6 +14,9 @@ ServerSocket::ServerSocket(asio::io_context& ioContext, int port):
 ServerSocket::~ServerSocket() {
     std::error_code ec;
     m_acceptor.close(ec);
+    if (ec) {
+        std::cout << "Server tarafında socket kapatılamadı." << std::endl;
+    }
 }
 
 void ServerSocket::start() {
@@ -30,7 +33,7 @@ void ServerSocket::startAccept() {
             if (!error) {
 
                 newConnection->startListening();
-                std::cout << "Server tarafından yeni bağlantı geldi ve sınıfa devredildi." << std::endl;
+                std::cout << "Server tarafında yeni bağlantı geldi ve sınıfa devredildi." << std::endl;
 
             }
 

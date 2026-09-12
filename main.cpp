@@ -30,11 +30,19 @@ void connect(asio::io_context& ioContext, const std::string& ip) {
 
 }
 
-void send(std::string peerKey, std::string message) {
+void sendmessage(std::string peerKey, std::string message) {
 
     auto it = clientPool.find(peerKey);
 
     it->second->sendMessage(message);
+
+}
+
+void sendfile(std::string peerKey, std::string filePath) {
+
+    auto it = clientPool.find(peerKey);
+
+    it->second->sendFile(filePath);
 
 }
 
@@ -70,11 +78,20 @@ int main() {
                 connect(ioContext, "127.0.0.1");
                 baglanti = true;
 
+            } else if (baglanti == true && komut.starts_with("C")) {
+
+                const std::string& filePath = komut;
+
+                std::string peerKey = "127.0.0.1:" + std::to_string(port);
+                sendfile(peerKey, filePath);
+
+
             } else if (baglanti == true) {
                 const std::string& message = komut;
 
                 std::string peerKey = "127.0.0.1:" + std::to_string(port);
-                send(peerKey, message);
+                std::cout << message << " mesajı gönderiliyor" << std::endl;
+                sendmessage(peerKey, message);
 
             }
 
