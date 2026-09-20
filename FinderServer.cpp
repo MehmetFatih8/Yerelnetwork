@@ -37,22 +37,22 @@ void FinderServer::startListening() {
             if (!ec) {
 
                 const std::string ip = m_endpoint.address().to_string();
-                //ip_port = ip + ":" + std::to_string(m_endpoint.port());
 
-                // if (ip == localip || ip == "127.0.0.1") {
-                //
-                //     std::cout << "Bizim ipden mesaj geldi." << std::endl;
-                //     startListening();
-                //     return;
-                //
-                // }
 
-                if (ip == "127.0.0.1") {
+                if (ip == localip || ip == "127.0.0.1") {
 
+                    std::cout << "Bizim ipden mesaj geldi." << std::endl;
                     startListening();
                     return;
 
                 }
+
+                // if (ip == "127.0.0.1") {
+                //
+                //     startListening();
+                //     return;
+                //
+                // }
 
                 //std::cout << ip_port << "'tan mesaj: " << std::string_view(m_buffer.data(), bytesTransferred) << std::endl;
 
