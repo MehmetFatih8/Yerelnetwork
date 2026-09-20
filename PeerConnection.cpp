@@ -80,7 +80,7 @@ void PeerConnection::HandleRead(const std::error_code& error, std::size_t bytesT
         std::size_t colonPos = payload.find(':');
         if (colonPos != std::string::npos) {
             std::string actualMessage = payload.substr(colonPos + 1);
-            std::cout << ip_port << "'tan gelen mesaj: " << actualMessage << std::endl;
+            std::cout << ip_port << "'tan gelen mesaj:" << actualMessage << std::endl;
         }
 
     }
@@ -88,9 +88,6 @@ void PeerConnection::HandleRead(const std::error_code& error, std::size_t bytesT
 
     // DOSYA AKTARIMI BAŞLATILDIĞINDA
     else if (bytesTransferred >= FILE_PREFIX.size() && std::string(m_buffer.data(), FILE_PREFIX.size()) == std::string(FILE_PREFIX)) {
-
-        // C:\Users\MehmetFatih\Desktop\Yerelkesif\loyloyloy.txt
-
 
         std::string payload(m_buffer.data() + FILE_PREFIX.size(), bytesTransferred - FILE_PREFIX.size());
         std::stringstream ss(payload);

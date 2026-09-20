@@ -33,7 +33,7 @@ void ServerSocket::startAccept() {
             if (!error) {
 
                 newConnection->startListening();
-                std::cout << "Server tarafında yeni bağlantı geldi ve sınıfa devredildi." << std::endl;
+                //std::cout << "Server tarafında yeni bağlantı geldi ve sınıfa devredildi." << std::endl;
 
             }
 

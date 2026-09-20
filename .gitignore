@@ -2,7 +2,6 @@
 .idea/
 cmake-build-debug/
 cmake-build-release/
-index.html
 
 # Olası derleme artıkları
 *.exe

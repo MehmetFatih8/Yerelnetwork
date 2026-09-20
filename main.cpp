@@ -8,39 +8,41 @@
 #include <asio.hpp>
 #include "ServerSocket.h"
 #include "ClientSocket.h"
+#include "FinderClient.h"
+#include "FinderServer.h"
 
 //constexpr std::string ip = "127.0.0.1";
-constexpr unsigned int port = 9999;
+constexpr unsigned int tcp_port = 9999;
+constexpr unsigned int udp_port = 8888;
 std::unordered_map<std::string, ClientSocket::Pointer> clientPool;
 
 void connect(asio::io_context& ioContext, const std::string& ip) {
 
-    std::string peerKey = ip + ":" + std::to_string(port);
-    std::cout << peerKey << "'e bağlanılıyor." << std::endl;
+    std::cout << ip << "'e bağlanılıyor." << std::endl;
 
     auto newClient = ClientSocket::create(ioContext);
-    newClient->connect(ip, port, [](bool connected) {
+    newClient->connect(ip, tcp_port, [](bool connected) {
 
                 if (connected) {
-                    std::cout << "Bağlantı başarılı" << std::endl;
+                    std::cout << "Bağlantı başarılı." << std::endl;
                 }
     });
 
-    clientPool[peerKey] = newClient;
+    clientPool[ip] = newClient;
 
 }
 
-void sendmessage(std::string peerKey, std::string message) {
+void sendmessage(const std::string& ip, const std::string& message) {
 
-    auto it = clientPool.find(peerKey);
+    auto it = clientPool.find(ip);
 
     it->second->sendMessage(message);
 
 }
 
-void sendfile(std::string peerKey, std::string filePath) {
+void sendfile(const std::string& ip, const std::string& filePath) {
 
-    auto it = clientPool.find(peerKey);
+    auto it = clientPool.find(ip);
 
     it->second->sendFile(filePath);
 
@@ -56,8 +58,22 @@ int main() {
 
         auto workGuard = asio::make_work_guard(ioContext);
 
-        ServerSocket server(ioContext, port);
+        ServerSocket server(ioContext, tcp_port);
         server.start();
+
+
+        FinderClient finder1 = FinderClient(ioContext, udp_port);
+
+        FinderServer finder0(ioContext, udp_port, finder1);
+
+        finder0.setOnDeviceDiscovered([&ioContext, &finder0](const std::string& ip) {
+            std::cout << ip << " " << finder0.devices.find(ip)->second << " ile bağlantı kuruluyor." << std::endl;
+            connect(ioContext, ip);
+        });
+
+        finder0.start();
+
+
 
         std::thread workerThread([&ioContext]() {
             ioContext.run();
@@ -65,34 +81,55 @@ int main() {
 
         std::cout << "Başladı." << std::endl;
 
-        bool baglanti{false};
+        finder1.start();
+
         while (true) {
 
             std::string komut;
-            std::cin >> komut;
+            std::getline(std::cin, komut);
+
 
             if (komut == "exit") {
                 break;
-            } else if (komut == "connect") {
-
-                connect(ioContext, "127.0.0.1");
-                baglanti = true;
-
-            } else if (baglanti == true && komut.starts_with("C")) {
-
-                const std::string& filePath = komut;
-
-                std::string peerKey = "127.0.0.1:" + std::to_string(port);
-                sendfile(peerKey, filePath);
+            }
 
 
-            } else if (baglanti == true) {
-                const std::string& message = komut;
+            // if (baglanti == true && komut.starts_with('C')) {
+            //
+            //     const std::string& filePath = komut;
+            //
+            //     std::string peerKey = "127.0.0.1:" + std::to_string(tcp_port);
+            //     sendfile(peerKey, filePath);
+            //
+            //
+            // }
 
-                std::string peerKey = "127.0.0.1:" + std::to_string(port);
-                std::cout << message << " mesajı gönderiliyor" << std::endl;
-                sendmessage(peerKey, message);
+            bool success{false};
 
+            size_t colonPos = komut.find(':');
+
+            if (colonPos != std::string::npos || colonPos != 0) {
+
+                std::string input_username = komut.substr(0, colonPos);
+                std::string message = komut.substr(colonPos + 1);
+
+                for (const auto& [ip, username] : finder0.devices) {
+                    if (username == input_username) {
+                        std::cout << message << " mesajı gönderiliyor" << std::endl;
+                        success = true;
+
+                        if (message.starts_with('C')) {
+                            sendfile(ip, message);
+                        } else {
+                            sendmessage(ip, message);
+                        }
+
+                    }
+                }
+
+            }
+            if (!success) {
+                std::cout << "Mesaj gönderme sırasında bir hata oldu." << std::endl;
             }
 
         }

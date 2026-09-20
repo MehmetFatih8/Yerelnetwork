@@ -26,11 +26,11 @@ void ClientSocket::connect(const std::string& host, unsigned short port, std::fu
 
         if (!ec) {
             m_isConnected = true;
-            std::cout << "Client tarafında bağlantı başarılı." << std::endl;
+            //std::cout << "Client tarafında bağlantı başarılı." << std::endl;
             if (onConnected) onConnected(true);
         } else {
             m_isConnected = false;
-            std::cout << "Client tarafında bağlantı başarısız: " << ec.message() << std::endl;
+            std::cerr << "Client tarafında bağlantı başarısız: " << ec.message() << std::endl;
             if (onConnected) onConnected(false);
         }
 
@@ -40,7 +40,7 @@ void ClientSocket::connect(const std::string& host, unsigned short port, std::fu
 
 void ClientSocket::sendMessage(const std::string &message) {
     if (!m_isConnected) {
-        std::cout << "Bağlantı yok mesaj gönderilemedi." << std::endl;
+        std::cerr << "Bağlantı yok mesaj gönderilemedi." << std::endl;
         return;
     }
 
@@ -52,7 +52,7 @@ void ClientSocket::sendMessage(const std::string &message) {
     asio::async_write(m_socket, asio::buffer(*msgBuffer),
         [this, self = shared_from_this(), msgBuffer](const std::error_code ec, std::size_t ) {
             if (ec) {
-                std::cout << "Mesaj gönderim hatası: " << ec.message() << std::endl;
+                std::cerr << "Mesaj gönderim hatası: " << ec.message() << std::endl;
                 m_isConnected = false;
             }
         });
@@ -61,13 +61,13 @@ void ClientSocket::sendMessage(const std::string &message) {
 void ClientSocket::sendFile(const std::string &filePath) {
 
     if (!m_isConnected) {
-        std::cout << "Bağlantı yok dosya gönderilemedi." << std::endl;
+        std::cerr << "Bağlantı yok dosya gönderilemedi." << std::endl;
         return;
     }
 
     auto file = std::make_shared<std::ifstream>(filePath, std::ios::binary | std::ios::ate);
     if (!file->is_open()) {
-        std::cout << "Dosya açılamadı." << std::endl;
+        std::cerr << "Dosya açılamadı." << std::endl;
         return;
     }
 
