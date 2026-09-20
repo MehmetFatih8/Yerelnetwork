@@ -19,6 +19,8 @@ class FinderClient {
         asio::ip::udp::endpoint m_endpoint;
         asio::steady_timer m_timer;
         void Find();
+        std::string getSystemUsername();
+        std::string username;
 
         std::string discoveryMsg = "P2P_DISCOVER_HELLO";
         std::string matchMsg = "P2P_MATCH_HELLO";

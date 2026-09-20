@@ -54,6 +54,12 @@ int main() {
 
         std::setlocale(LC_ALL, "tr_TR.UTF-8");
 
+        #if defined(_WIN32)
+                // Konsol girdi ve çıktılarını UTF-8 standardına çek
+                SetConsoleCP(CP_UTF8);
+                SetConsoleOutputCP(CP_UTF8);
+        #endif
+
         asio::io_context ioContext;
 
         auto workGuard = asio::make_work_guard(ioContext);

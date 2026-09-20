@@ -41,7 +41,7 @@ void FinderServer::startListening() {
 
                 if (ip == localip || ip == "127.0.0.1") {
 
-                    std::cout << "Bizim ipden mesaj geldi." << std::endl;
+                    //std::cout << "Bizim ipden mesaj geldi." << std::endl;
                     startListening();
                     return;
 
@@ -56,21 +56,27 @@ void FinderServer::startListening() {
 
                 //std::cout << ip_port << "'tan mesaj: " << std::string_view(m_buffer.data(), bytesTransferred) << std::endl;
 
-                if (std::string_view(m_buffer.data(), bytesTransferred) == discoveryMsg) {
-
-                    if (!devices.contains(ip)) {
-                        m_finderClient.Match(m_endpoint);
-                    }
+                if (std::string_view(m_buffer.data(), bytesTransferred).starts_with(discoveryMsg)) {
+                    m_finderClient.Match(m_endpoint);
 
                 }
 
-                if (std::string_view(m_buffer.data(), bytesTransferred) == matchMsg) {
+                if (std::string_view(m_buffer.data(), bytesTransferred).starts_with(matchMsg)) {
 
-                    devices[ip] = getSystemUsername();
-                    //std::cout << ip << " -> " << devices.find(ip)->second << std::endl;
+                    if (!devices.contains(ip)) {
 
-                    if (m_onDeviceDiscovered) {
-                        m_onDeviceDiscovered(ip);
+                        std::string text = std::string(m_buffer.data(), bytesTransferred);
+                        size_t colonPos = text.find(':');
+
+                        std::string username = text.substr(colonPos + 1);
+                        //std::cout << username << std::endl;
+                        devices[ip] = username;
+                        //std::cout << ip << " -> " << devices.find(ip)->second << std::endl;
+
+                        if (m_onDeviceDiscovered) {
+                            m_onDeviceDiscovered(ip);
+                        }
+
                     }
 
                 }
@@ -124,61 +130,3 @@ std::string FinderServer::getLocalIP() {
     return "Bulunamadı.";
 }
 
-
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <unistd.h>
-#include <sys/types.h>
-#include <pwd.h>
-#endif
-
-std::string FinderServer::getSystemUsername() {
-#if defined(_WIN32)
-    // 1. Windows API (GetUserNameA) ile oturum açmış kullanıcı adını al
-    char username[256];
-    DWORD size = sizeof(username);
-    if (GetUserNameA(username, &size)) {
-        return std::string(username);
-    }
-
-    // 2. Başarısız olursa USERNAME ortam değişkenini kontrol et
-    const char* envUser = std::getenv("USERNAME");
-    if (envUser != nullptr && envUser[0] != '\0') {
-        return std::string(envUser);
-    }
-
-#else
-    // 1. Linux POSIX API (getpwuid_r) ile kullanıcı adını al
-    uid_t uid = geteuid();
-    struct passwd pwd;
-    struct passwd* result = nullptr;
-    char buffer[1024];
-
-    if (getpwuid_r(uid, &pwd, buffer, sizeof(buffer), &result) == 0 && result != nullptr) {
-        if (result->pw_name != nullptr && result->pw_name[0] != '\0') {
-            return std::string(result->pw_name);
-        }
-    }
-
-    // 2. Başarısız olursa getlogin() veya ortam değişkenlerini kontrol et
-    char* loginName = getlogin();
-    if (loginName != nullptr && loginName[0] != '\0') {
-        return std::string(loginName);
-    }
-
-    const char* envUser = std::getenv("USER");
-    if (envUser == nullptr || envUser[0] == '\0') {
-        envUser = std::getenv("LOGNAME");
-    }
-
-    if (envUser != nullptr && envUser[0] != '\0') {
-        return std::string(envUser);
-    }
-#endif
-
-    return "UnknownUser";
-}

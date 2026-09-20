@@ -38,7 +38,7 @@ void PeerConnection::cleanupIncompleteFile() {
 
 void PeerConnection::HandleRead(const std::error_code& error, std::size_t bytesTransferred) {
 
-
+    ip_port = (m_socket.remote_endpoint().address().to_string() + std::to_string(m_socket.remote_endpoint().port()));
 
     // DOSYA AKTARIMI YARIDA KESİLİRSE
     if (error && m_isReceivingFile) {
@@ -52,8 +52,6 @@ void PeerConnection::HandleRead(const std::error_code& error, std::size_t bytesT
         std::cout << ip_port << "'tan mesaj alınamadı. Clienttan mesaj bekleme döngüsünü öldürüyorum." << std::endl;
         return;
     }
-
-    ip_port = (m_socket.remote_endpoint().address().to_string() + std::to_string(m_socket.remote_endpoint().port()));
 
 
     // DOSYA AKTARIMI SIRASINDA

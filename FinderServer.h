@@ -22,7 +22,7 @@ class FinderServer {
         std::string getLocalIP();
         FinderClient& m_finderClient;
         std::function<void(const std::string& ip)> m_onDeviceDiscovered;
-        std::string getSystemUsername();
+
 
         std::string localip;
         std::string discoveryMsg = "P2P_DISCOVER_HELLO";
