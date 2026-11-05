@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+#include "Logger.h"
+
 
 FinderClient::FinderClient(asio::io_context& ioContext, int port):
     m_socket(ioContext),
@@ -16,7 +18,7 @@ FinderClient::FinderClient(asio::io_context& ioContext, int port):
             m_socket.open(asio::ip::udp::v4());
             m_socket.set_option(asio::socket_base::broadcast(true));
         }   catch (std::exception& e) {
-            std::cerr << "FinderClient tarafında tanım kısmında hata: " << e.what() << std::endl;
+            LOG() << "ERR -> FinderClient tarafında tanım kısmında hata: " << e.what();
         }
 }
 
@@ -53,7 +55,7 @@ void FinderClient::Find() {
 
 
             } else {
-                std::cerr << "FinderClient tarafında keşif anında hata: " << ec.message() << std::endl;
+                LOG() << "ERR -> FinderClient tarafında keşif anında hata: " << ec.message();
             }
         }
 

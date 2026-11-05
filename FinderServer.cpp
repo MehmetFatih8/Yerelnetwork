@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "FinderClient.h"
+#include "Logger.h"
 
 
 FinderServer::FinderServer(asio::io_context& ioContext, int port, FinderClient& finderClient):
@@ -47,12 +48,6 @@ void FinderServer::startListening() {
 
                 }
 
-                // if (ip == "127.0.0.1") {
-                //
-                //     startListening();
-                //     return;
-                //
-                // }
 
                 //std::cout << ip_port << "'tan mesaj: " << std::string_view(m_buffer.data(), bytesTransferred) << std::endl;
 
@@ -63,27 +58,34 @@ void FinderServer::startListening() {
 
                 if (std::string_view(m_buffer.data(), bytesTransferred).starts_with(matchMsg)) {
 
-                    if (!devices.contains(ip)) {
+                    bool is_newdevice = false;
 
-                        std::string text = std::string(m_buffer.data(), bytesTransferred);
-                        size_t colonPos = text.find(':');
+                    {
+                        std::lock_guard<std::mutex> lock(devicesMutex);
+                        if (!devices.contains(ip)) {
 
-                        std::string username = text.substr(colonPos + 1);
-                        //std::cout << username << std::endl;
-                        devices[ip] = username;
-                        //std::cout << ip << " -> " << devices.find(ip)->second << std::endl;
+                            is_newdevice = true;
 
-                        if (m_onDeviceDiscovered) {
-                            m_onDeviceDiscovered(ip);
+                            std::string text = std::string(m_buffer.data(), bytesTransferred);
+                            size_t colonPos = text.find(':');
+
+                            std::string username = text.substr(colonPos + 1);
+                            //std::cout << username << std::endl;
+                            devices[ip] = username;
+                            //std::cout << ip << " -> " << devices.find(ip)->second << std::endl;
+
                         }
+                    }
 
+                    if (m_onDeviceDiscovered && is_newdevice) {
+                        m_onDeviceDiscovered(ip);
                     }
 
                 }
 
 
             } else {
-                std::cerr << "FinderServer tarafında hata: " << ec.message() << std::endl;
+                LOG() << "ERR -> FinderServer tarafında hata: " << ec.message();
             }
 
             startListening();
@@ -114,17 +116,14 @@ std::string FinderServer::getLocalIP() {
                     return ipStr;
                 }
 
-                std::cout << "Garip ip: " << ipStr << std::endl;
-
+                LOG() << "Garip ip: " << ipStr;
 
             }
 
         }
 
     } catch (const std::exception& e) {
-
-        std::cerr << "Local IP bulunamadı: " << e.what() << std::endl;
-
+        LOG() << "ERR -> Local IP bulunamadı: " << e.what();
     }
 
     return "Bulunamadı.";

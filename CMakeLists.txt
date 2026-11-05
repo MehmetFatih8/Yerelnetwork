@@ -24,7 +24,8 @@ add_executable(Yerelkesif main.cpp
         FinderServer.cpp
         FinderServer.h
         FinderClient.cpp
-        FinderClient.h)
+        FinderClient.h
+        Logger.h)
 
 target_include_directories(Yerelkesif PRIVATE ${asio_SOURCE_DIR}/include)
 

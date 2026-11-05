@@ -36,8 +36,8 @@ class FinderServer {
             m_onDeviceDiscovered = std::move(callback);
         }
         void start();
-        std::unordered_map<std::string, std::string> devices;
-
+        inline static std::unordered_map<std::string, std::string> devices;
+        inline static std::mutex devicesMutex;
 };
 
 
