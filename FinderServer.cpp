@@ -1,131 +1,66 @@
-//
-// Created by MehmetFatih on 13.09.2026.
-//
-
 #include "FinderServer.h"
 
-#include <iostream>
-
-#include "FinderClient.h"
 #include "Logger.h"
+#include "Protocol.h"
 
+namespace {
 
-FinderServer::FinderServer(asio::io_context& ioContext, int port, FinderClient& finderClient):
-    m_socket(ioContext, asio::ip::udp::endpoint(asio::ip::udp::v4(), port)),
-    m_buffer(1024),
-    m_resolver(ioContext),
-    m_finderClient(finderClient){}
+std::set<std::string> CollectLocalIps(asio::ip::tcp::resolver& resolver) {
+    std::set<std::string> ips;
+    std::error_code ec;
+    const auto results = resolver.resolve(asio::ip::host_name(), "", ec);
+    if (ec) {
+        LOG() << "ERR -> Yerel IP listesi alınamadı: " << ec.message();
+        return ips;
+    }
+    for (const auto& entry : results) {
+        const auto address = entry.endpoint().address();
+        if (address.is_v4()) ips.insert(address.to_string());
+    }
+    return ips;
+}
 
+}  // namespace
+
+FinderServer::FinderServer(asio::io_context& io, unsigned short port, FinderClient& finderClient, NetEventsPtr events)
+    : m_socket(io, asio::ip::udp::endpoint(asio::ip::udp::v4(), port)),
+      m_buffer(1024),
+      m_finderClient(finderClient),
+      m_events(std::move(events)) {}
 
 void FinderServer::start() {
-    localip = getLocalIP();
+    asio::ip::tcp::resolver resolver(m_socket.get_executor());
+    m_localIps = CollectLocalIps(resolver);
     startListening();
 }
 
-FinderServer::~FinderServer() {
-    if (m_socket.is_open()) {
-        m_socket.cancel();
-        m_socket.close();
-    }
-}
-
-
 void FinderServer::startListening() {
-
-    m_socket.async_receive_from(asio::buffer(m_buffer),m_endpoint,
-        [this](const std::error_code& ec , std::size_t bytesTransferred) {
-
-            if (!ec) {
-
-                const std::string ip = m_endpoint.address().to_string();
-
-
-                if (ip == localip || ip == "127.0.0.1") {
-
-                    //std::cout << "Bizim ipden mesaj geldi." << std::endl;
-                    startListening();
-                    return;
-
-                }
-
-
-                //std::cout << ip_port << "'tan mesaj: " << std::string_view(m_buffer.data(), bytesTransferred) << std::endl;
-
-                if (std::string_view(m_buffer.data(), bytesTransferred).starts_with(discoveryMsg)) {
-                    m_finderClient.Match(m_endpoint);
-
-                }
-
-                if (std::string_view(m_buffer.data(), bytesTransferred).starts_with(matchMsg)) {
-
-                    bool is_newdevice = false;
-
-                    {
-                        std::lock_guard<std::mutex> lock(devicesMutex);
-                        if (!devices.contains(ip)) {
-
-                            is_newdevice = true;
-
-                            std::string text = std::string(m_buffer.data(), bytesTransferred);
-                            size_t colonPos = text.find(':');
-
-                            std::string username = text.substr(colonPos + 1);
-                            //std::cout << username << std::endl;
-                            devices[ip] = username;
-                            //std::cout << ip << " -> " << devices.find(ip)->second << std::endl;
-
-                        }
-                    }
-
-                    if (m_onDeviceDiscovered && is_newdevice) {
-                        m_onDeviceDiscovered(ip);
-                    }
-
-                }
-
-
+    m_socket.async_receive_from(asio::buffer(m_buffer), m_sender,
+        [this](const std::error_code& ec, std::size_t bytes) {
+            if (ec) {
+                // Gönderilen bir paket için ICMP hatası gelebilir; yalnızca soket kapandıysa dinlemeyi bırak
+                LOG() << "ERR -> FinderServer dinleme hatası: " << ec.message();
+                if (!m_socket.is_open()) return;
             } else {
-                LOG() << "ERR -> FinderServer tarafında hata: " << ec.message();
+                handleDatagram(std::string_view(m_buffer.data(), bytes), m_sender);
             }
-
             startListening();
-
         });
-
 }
 
+void FinderServer::handleDatagram(std::string_view text, const asio::ip::udp::endpoint& sender) {
+    const std::string ip = sender.address().to_string();
+    if (sender.address().is_loopback() || m_localIps.contains(ip)) return;
 
-std::string FinderServer::getLocalIP() {
-    try {
-
-        auto endpoints = m_resolver.resolve(asio::ip::host_name(), "");
-
-        for (const auto& entry : endpoints) {
-            auto addr = entry.endpoint().address();
-
-            if (addr.is_v4() && !addr.is_loopback()) {
-
-                std::string ipStr = addr.to_string();
-
-                //192.168.56 VM'lerin default ipsi
-                if (ipStr.rfind("192.168", 0) == 0 && ipStr.rfind("192.168.56.", 0) != 0) {
-                    return ipStr;
-                }
-
-                if (ipStr.rfind("10.", 0) == 0) {
-                    return ipStr;
-                }
-
-                LOG() << "Garip ip: " << ipStr;
-
-            }
-
-        }
-
-    } catch (const std::exception& e) {
-        LOG() << "ERR -> Local IP bulunamadı: " << e.what();
+    if (text.starts_with(Protocol::kDiscoverPrefix)) {
+        m_finderClient.Match(sender);
+        return;
     }
 
-    return "Bulunamadı.";
+    if (text.starts_with(Protocol::kMatchPrefix)) {
+        // "P2P_MATCH_HELLO:<kullanıcı adı>"
+        auto name = text.substr(Protocol::kMatchPrefix.size());
+        if (name.starts_with(':')) name.remove_prefix(1);
+        m_events->onMatch(ip, name.empty() ? ip : std::string(name));
+    }
 }
-

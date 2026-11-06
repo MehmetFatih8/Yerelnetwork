@@ -1,27 +1,26 @@
-//
-// Created by MehmetFatih on 11.09.2026.
-//
+#pragma once
 
-#ifndef YERELKESIF_SERVERSOCKET_H
-#define YERELKESIF_SERVERSOCKET_H
-#include "asio.hpp"
+#include <asio.hpp>
+#include <string>
+#include <unordered_map>
+
+#include "NetEvents.h"
 #include "PeerConnection.h"
 
-
+// Gelen TCP bağlantılarını kabul eder. Aynı IP'den gelen mesaj ve dosya soketlerini eşleştirip
+// bir PeerConnection altında birleştirir.
 class ServerSocket {
-    public:
-        ServerSocket(asio::io_context& ioContext, int main_port, int file_port);
-        ~ServerSocket();
-        void start();
+public:
+    ServerSocket(asio::io_context& io, NetEventsPtr events, unsigned short mainPort, unsigned short filePort);
 
-    private:
-        void mainAccept();
-        void fileAccept();
-        std::unordered_map<std::string, PeerConnection::Pointer> m_pending;
-        asio::io_context& m_ioContext;
-        asio::ip::tcp::acceptor m_mainacceptor;
-        asio::ip::tcp::acceptor m_fileacceptor;
+    void start();
+
+private:
+    void acceptLoop(asio::ip::tcp::acceptor& acceptor, bool isMain);
+
+    asio::io_context& m_io;
+    NetEventsPtr m_events;
+    asio::ip::tcp::acceptor m_mainAcceptor;
+    asio::ip::tcp::acceptor m_fileAcceptor;
+    std::unordered_map<std::string, PeerConnection::Pointer> m_pending;
 };
-
-
-#endif //YERELKESIF_SERVERSOCKET_H

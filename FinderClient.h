@@ -1,30 +1,24 @@
-//
-// Created by MehmetFatih on 13.09.2026.
-//
+#pragma once
 
-#ifndef YERELKESIF_FINDERCLIENT_H
-#define YERELKESIF_FINDERCLIENT_H
-#include "asio.hpp"
+#include <asio.hpp>
+#include <string>
 
-
+// UDP keşif yayını (3 saniyede bir) ve keşif isteklerine verilen eşleşme yanıtları.
 class FinderClient {
-    public:
-        FinderClient(asio::io_context& ioContext, int port);
-        ~FinderClient();
-        void start();
-        void Match(const asio::ip::udp::endpoint& matchEndpoint);
+public:
+    FinderClient(asio::io_context& io, unsigned short port);
 
-    private:
-        asio::ip::udp::socket m_socket;
-        asio::ip::udp::endpoint m_endpoint;
-        asio::steady_timer m_timer;
-        void Find();
-        std::string getSystemUsername();
-        std::string username;
+    void start();                                           // Kullanıcı adını alır ve yayını başlatır
+    void Match(const asio::ip::udp::endpoint& requester);   // Keşif isteğine eşleşme yanıtı verir
+    void Probe(const std::string& ip);                      // Belirli bir IP'ye keşif isteği (manuel ekleme)
 
-        std::string discoveryMsg = "P2P_DISCOVER_HELLO";
-        std::string matchMsg = "P2P_MATCH_HELLO";
+private:
+    void Find();
+    void send(const std::string& text, const asio::ip::udp::endpoint& to);
+    static std::string getSystemUsername();
+
+    asio::ip::udp::socket m_socket;
+    asio::ip::udp::endpoint m_broadcast;
+    asio::steady_timer m_timer;
+    std::string m_username;   // UTF-8
 };
-
-
-#endif //YERELKESIF_FINDERCLIENT_H

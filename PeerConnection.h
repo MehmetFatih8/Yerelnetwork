@@ -1,68 +1,60 @@
-//
-// Created by MehmetFatih on 11.09.2026.
-//
-
-#ifndef YERELKESIF_PEERCONNECTION_H
-#define YERELKESIF_PEERCONNECTION_H
+#pragma once
 
 #include <asio.hpp>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <vector>
 
+#include "NetEvents.h"
 
-
+// Bir cihazdan gelen iki TCP bağlantısını (mesaj ve dosya) birleştirir ve gelen çerçeveleri çözer.
 class PeerConnection : public std::enable_shared_from_this<PeerConnection> {
-    public:
-        using Pointer =std::shared_ptr<PeerConnection>;
+public:
+    using Pointer = std::shared_ptr<PeerConnection>;
 
-        static Pointer create(asio::io_context& io_context) {
-            return Pointer(new PeerConnection(io_context));
-        }
+    static Pointer create(asio::io_context& io, NetEventsPtr events, std::string ip) {
+        return Pointer(new PeerConnection(io, std::move(events), std::move(ip)));
+    }
 
-        void startListening();
+    void setMainSocket(asio::ip::tcp::socket&& socket) { m_main = std::move(socket); }
+    void setFileSocket(asio::ip::tcp::socket&& socket) { m_file = std::move(socket); }
+    bool isReady() const { return m_main.is_open() && m_file.is_open(); }
 
-        void set_mainsocket(asio::ip::tcp::socket&& socket) {
-            m_mainsocket = std::move(socket);
-        }
+    void startListening();
 
-        void set_filesocket(asio::ip::tcp::socket&& socket) {
-            m_filesocket = std::move(socket);
-        }
+private:
+    PeerConnection(asio::io_context& io, NetEventsPtr events, std::string ip);
 
-        bool isReady() const {
-            return m_mainsocket.is_open() && m_filesocket.is_open();
-        }
+    void readMain();
+    void readFile();
+    void parseMain();
+    void parseFile();
+    void beginReceive(const std::string& utf8Name, std::uint64_t size);
+    void finishReceive();
+    void abortReceive(const std::string& reason);
+    void notifyIncoming(TransferInfo::Stage stage, const std::string& detail);
+    void sendFileReply(std::string_view reply);
+    void handleLost(const std::error_code& ec);
 
+    NetEventsPtr m_events;
+    std::string m_ip;
+    asio::ip::tcp::socket m_main;
+    asio::ip::tcp::socket m_file;
+    std::vector<char> m_mainChunk;
+    std::vector<char> m_fileChunk;
+    std::string m_mainBuffer;   // Parçalı gelebilen mesaj çerçeveleri için birikim tamponu
+    std::string m_fileBuffer;
 
-
-    private:
-        explicit PeerConnection(asio::io_context& io_context);
-
-        void Handle_mainRead(const std::error_code& error, std::size_t bytesTransferred);
-        void Handle_fileRead(const std::error_code& error, std::size_t bytesTransferred);
-        void cleanupIncompleteFile();
-
-        asio::io_context& m_ioContext;
-        asio::ip::tcp::socket m_mainsocket;
-        asio::ip::tcp::socket m_filesocket;
-        std::vector<char> m_mainbuffer;
-        std::vector<char> m_filebuffer;
-
-        std::ofstream m_outputFile;
-        std::string m_currentFileName;
-        std::size_t m_remainingBytes{0};
-        std::size_t m_totalFileBytes{0};
-        bool m_isReceivingFile{false};
-
-        //constexpr static std::string_view FILE_PREFIX_RAW = std::string_view("\x00\xFF__P2P_FILE__\x1F", 17);
-        //inline static const std::string FILE_PREFIX{FILE_PREFIX_RAW.data(), FILE_PREFIX_RAW.size()};
-
-        //constexpr static std::string_view MSG_PREFIX_RAW = std::string_view("\x00\xFF__P2P_MSG__\x1F", 16);
-        //inline static const std::string MSG_PREFIX{MSG_PREFIX_RAW.data(), MSG_PREFIX_RAW.size()};
-
+    // Gelen dosyanın durumu
+    std::ofstream m_out;
+    std::filesystem::path m_outPath;
+    std::string m_outName;
+    std::uint64_t m_expected{0};
+    std::uint64_t m_received{0};
+    bool m_receiving{false};
+    bool m_lost{false};
 };
-
-
-#endif //YERELKESIF_PEERCONNECTION_H

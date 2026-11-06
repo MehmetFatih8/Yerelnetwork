@@ -1,49 +1,58 @@
-//
-// Created by MehmetFatih on 11.09.2026.
-//
+#pragma once
 
-#ifndef YERELKESIF_CLIENTSOCKET_H
-#define YERELKESIF_CLIENTSOCKET_H
-#include <memory>
 #include <asio.hpp>
+#include <deque>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "NetEvents.h"
 
+// Bir cihaza giden TCP bağlantısı: mesajlar ana soket, dosyalar dosya soketi üzerinden gider.
+// Tüm çağrılar io thread'inde yapılmalıdır (AppController bunu sağlar).
 class ClientSocket : public std::enable_shared_from_this<ClientSocket> {
-    public:
-        using Pointer = std::shared_ptr<ClientSocket>;
+public:
+    using Pointer = std::shared_ptr<ClientSocket>;
 
-        static Pointer create(asio::io_context& ioContext) {
-            return Pointer(new ClientSocket(ioContext));
-        }
+    static Pointer create(asio::io_context& io, NetEventsPtr events, std::string ip) {
+        return Pointer(new ClientSocket(io, std::move(events), std::move(ip)));
+    }
 
-        void connect(const std::string& host, unsigned short main_port, unsigned short file_port, std::function<void(bool)> on_main_Connected = nullptr, std::function<void(bool)> on_file_Connected = nullptr);
+    // onReady her durumda tam bir kez çağrılır: iki soket de bağlandıysa true
+    void connect(unsigned short mainPort, unsigned short filePort, std::function<void(bool)> onReady);
+    bool isConnected() const { return m_connected; }
 
-        void sendMessage(const std::string& message);
-        void sendFile(const std::string& filePath);
+    void sendMessage(const std::string& text);
+    void sendFiles(const std::vector<std::filesystem::path>& files);
+    void close();
 
-        //bool isConnected() const {return m_isConnected;}
+private:
+    struct PendingFile {
+        std::filesystem::path path;
+        std::size_t index;
+        std::size_t total;
+    };
+    struct OutgoingFile;
 
-        ~ClientSocket();
+    ClientSocket(asio::io_context& io, NetEventsPtr events, std::string ip);
 
-    private:
-        explicit ClientSocket(asio::io_context& ioContext);
-        void sendNextChunk(std::shared_ptr<std::ifstream> file, std::size_t fileSize, std::size_t sentBytes);
+    void writeNextMessage();
+    void startNextFile();
+    void sendRequest(const std::shared_ptr<OutgoingFile>& file);
+    void waitForAck(const std::shared_ptr<OutgoingFile>& file);
+    void sendChunk(const std::shared_ptr<OutgoingFile>& file);
+    void finishFile(std::shared_ptr<OutgoingFile> file, bool ok, const std::string& reason);
+    void failBatch(std::shared_ptr<OutgoingFile> file, const std::string& reason);
+    void report(const OutgoingFile& file, TransferInfo::Stage stage, const std::string& detail);
 
-
-        asio::io_context& m_ioContext;
-        asio::ip::tcp::socket m_mainsocket;
-        asio::ip::tcp::socket m_filesocket;
-        bool m_mainisConnected{false};
-        bool m_fileisConnected{false};
-        std::vector<char> m_fileAckBuffer;
-
-
-        //constexpr static std::string_view FILE_PREFIX_RAW = std::string_view("\x00\xFF__P2P_FILE__\x1F", 17);
-        //inline static const std::string FILE_PREFIX{FILE_PREFIX_RAW.data(), FILE_PREFIX_RAW.size()};
-
-        //constexpr static std::string_view MSG_PREFIX_RAW = std::string_view("\x00\xFF__P2P_MSG__\x1F", 16);
-        //inline static const std::string MSG_PREFIX{MSG_PREFIX_RAW.data(), MSG_PREFIX_RAW.size()};
+    NetEventsPtr m_events;
+    std::string m_ip;
+    asio::ip::tcp::socket m_main;
+    asio::ip::tcp::socket m_file;
+    bool m_connected{false};
+    std::deque<std::shared_ptr<const std::string>> m_messages;   // Sıradaki ilk öğe yazılmakta olan paket
+    std::deque<PendingFile> m_files;
+    std::shared_ptr<OutgoingFile> m_current;
 };
-
-
-#endif //YERELKESIF_CLIENTSOCKET_H

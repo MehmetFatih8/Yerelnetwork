@@ -1,44 +1,30 @@
-//
-// Created by MehmetFatih on 13.09.2026.
-//
+#pragma once
 
-#ifndef YERELKESIF_FINDERSERVER_H
-#define YERELKESIF_FINDERSERVER_H
-#include <string>
-#include <unordered_map>
 #include <asio.hpp>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "FinderClient.h"
+#include "NetEvents.h"
 
-
+// UDP keşif portunu dinler. Keşif isteğine FinderClient ile yanıt verir,
+// eşleşme yanıtlarını NetEvents::onMatch ile denetleyiciye bildirir.
 class FinderServer {
-    private:
-        asio::ip::udp::socket m_socket;
-        std::vector<char> m_buffer;
-        asio::ip::udp::endpoint m_endpoint;
-        std::string ip_port;
-        asio::ip::tcp::resolver m_resolver;
-        void startListening();
-        std::string getLocalIP();
-        FinderClient& m_finderClient;
-        std::function<void(const std::string& ip)> m_onDeviceDiscovered;
+public:
+    FinderServer(asio::io_context& io, unsigned short port, FinderClient& finderClient, NetEventsPtr events);
 
+    void start();
 
-        std::string localip;
-        std::string discoveryMsg = "P2P_DISCOVER_HELLO";
-        std::string matchMsg = "P2P_MATCH_HELLO";
+private:
+    void startListening();
+    void handleDatagram(std::string_view text, const asio::ip::udp::endpoint& sender);
 
-    public:
-        FinderServer(asio::io_context& ioContext, int port, FinderClient& finderClient);
-        ~FinderServer();
-
-        void setOnDeviceDiscovered(std::function<void(const std::string& ip)> callback) {
-            m_onDeviceDiscovered = std::move(callback);
-        }
-        void start();
-        inline static std::unordered_map<std::string, std::string> devices;
-        inline static std::mutex devicesMutex;
+    asio::ip::udp::socket m_socket;
+    asio::ip::udp::endpoint m_sender;
+    std::vector<char> m_buffer;
+    std::set<std::string> m_localIps;   // Kendi paketlerimizi ayıklamak için yerel IPv4 adresleri
+    FinderClient& m_finderClient;
+    NetEventsPtr m_events;
 };
-
-
-#endif //YERELKESIF_FINDERSERVER_H
